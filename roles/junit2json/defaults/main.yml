@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# defaults file for role redhatci.ocp.junit2json
+
+junit2json_hash: sha256
+junit2json_debug: false
+junit2json_do_merge: true
