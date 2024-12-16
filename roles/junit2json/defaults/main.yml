@@ -1,0 +1,9 @@
+---
+# defaults file for role redhatci.ocp.junit2json
+
+# junit2json_reports_path: str - mandatory parameter containing xml files
+# junit2json_reports_path_patterns:
+#   - "*.xml"
+junit2json_result_json_path: "{{ junit2json_reports_path }}/report.junit.json"
+junit2json_debug: false
+junit2json_hash: sha256

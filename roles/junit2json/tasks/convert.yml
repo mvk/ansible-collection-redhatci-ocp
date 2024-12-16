@@ -1,0 +1,27 @@
+---
+# tasks file for redhatci.ocp.junit2json
+# task list: convert.yml consolidates multiple XMLs into 1 and converts it into JSoN
+
+- name: Ensure json data destination folder
+  ansible.builtin.file:
+    path: "{{ junit2json_result_json_path | dirname }}"
+    state: directory
+    mode: '0755'
+  when:
+    - junit2json_current_hash != junit2json_old_hash
+
+- name: Write json data to destination
+  ansible.builtin.copy:
+    content: "{{ junit2json_result_data_dict | to_json }}"
+    dest: "{{ junit2json_result_json_path }}"
+    mode: '0644'
+  when:
+    - junit2json_current_hash != junit2json_old_hash
+
+- name: Write current hash to destination
+  ansible.builtin.copy:
+    content: "{{ junit2json_current_hash }}"
+    dest: "{{ junit2json_old_hash_path }}"
+    mode: '0644'
+  when:
+    - junit2json_current_hash != junit2json_old_hash

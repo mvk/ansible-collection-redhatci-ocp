@@ -1,0 +1,73 @@
+---
+# tasks file for redhatci.ocp.junit2json
+# task list: convert.yml consolidates multiple XMLs into 1 and converts it into JSoN
+
+- name: Create helper empty list for XML data and filename
+  ansible.builtin.set_fact:
+    junit2json_reports_list: []
+    junit2json_merged_xml_path: "{{ junit2json_reports_path }}/merged.XML"
+
+- name: Update helper list of XML file names
+  ansible.builtin.set_fact:
+    junit2json_reports_list: "{{ junit2json_reports_list + [item] }}"
+  loop: "{{ _junit2json_find_results.files | map(attribute='path') }}"
+
+# debug only:
+- name: Print XML filenames data
+  ansible.builtin.debug:
+    msg:
+      - "XML files names: {{ junit2json_reports_list }}"
+  when:
+    - role_debug is defined
+    - role_debug
+
+- name: Merge multiple junit xml files into consolidated report
+  ansible.builtin.shell:
+    cmd: |
+      junitparser merge "{{ junit2json_reports_list | join('" "') }}" -
+  register: _junit2json_merged_xml
+  changed_when:
+    - _junit2json_merged_xml.rc != 0
+  failed_when:
+    - _junit2json_merged_xml.rc != 0
+
+- name: Write merge resulting file
+  ansible.builtin.copy:
+    content: "{{ _junit2json_merged_xml.stdout }}"
+    dest: "{{ junit2json_merged_xml_path }}" # so that our findings don't find it
+    mode: '0644'
+  when:
+    - role_debug is defined
+    - role_debug
+
+- name: Generate content hash from the content
+  ansible.builtin.set_fact:
+    junit2json_current_hash: "{{  _junit2json_merged_xml.stdout | ansible.builtin.hash(junit2json_hash) }}"
+    junit2json_old_hash_path: "{{ junit2json_merged_xml_path }}.{{ junit2json_hash }}"
+    junit2json_old_hash: ""
+
+# debug only:
+- name: Print merged XML report filename
+  ansible.builtin.debug:
+    msg:
+      - "XML consolidated report is at: {{ junit2json_reports_list }}"
+  when:
+    - role_debug is defined
+    - role_debug
+
+- name: Obtain info on previous content checksum file
+  ansible.builtin.stat:
+    path: "{{ junit2json_old_hash_path }}"
+    checksum_algorithm: "{{ junit2json_hash }}"
+  register: _junit2json_old_hash_stat
+
+
+- name: Update junit2json_result_data_dict
+  ansible.builtin.set_fact:
+    junit2json_result_data_dict: "{{ _junit2json_merged_xml.stdout | redhatci.ocp.junit2obj }}"
+
+- name: Update junit2json_old_hash
+  ansible.builtin.set_fact:
+    junit2json_old_hash: "{{ _junit2json_old_hash_stat.stat.checksum }}"
+  when:
+    - _junit2json_old_hash_stat.stat.exists

@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# tasks file for role redhatci.ocp.junit2json
+
+- name: Validate some variables
+  ansible.builtin.assert:
+    that: "{{ condition }}"
+  loop:
+    - global_reports_path_patterns | length > 0
+    - junit2json_reports_path | length > 0
+    - junit2json_result_json_path | length > 0
+  loop_control:
+    loop_var: condition
+
+- name: Create helper variables
+  ansible.builtin.set_fact:
+    junit2json_find_patterns: "{{ junit2json_supported_archives | map('regex_replace', '^', '*.') | list }}"
+    junit2json_rename_pattern: "(.{{ junit2json_supported_archives | join('$|.') }}$)"
+    cacheable: false
+
+- name: Find archives
+  ansible.builtin.find:
+    paths: "{{ junit2json_reports_path }}"
+    patterns: "{{ global_reports_path_patterns }}"
+    recurse: true
+  register: _junit2json_found_reports
+
+- name: Merge multiple mini-reports to one XML
+  ansible.builtin.include_tasks:
+    file: merge.yml
+  when:
+    - _junit2json_found_reports.matched > 0
+
+- name: Convert XML to JSON
+  ansible.builtin.include_tasks:
+    file: convert.yml
+  when:
+    - _junit2json_found_reports.matched > 0
+
+- name: Fail now
+  ansible.builtin.fail:
+    msg: "fail happily"
