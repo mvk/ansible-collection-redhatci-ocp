@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# tasks file for role `redhatci.ocp.junit2json`
+# collects possibly multiple XMLs from `path_item` (when it is a directory)
+
+- name: Print path_item value
+  ansible.builtin.debug:
+    msg: "path_item: {{ path_item }}"
+
+- name: Setup helper variable
+  ansible.builtin.set_fact:
+    junit2json_find_patterns: "{{ global_reports_path_patterns | map('regex_replace', '^', '*.') | list }}"
+    cacheable: false
+
+- name: Check whether the path_item is a directory
+  ansible.builtin.stat:
+    path: "{{ path_item }}"
+  register: _junit2json_path_item_stat
+
+- name: "Add path_item as a JUnit XML report [`stat.isdir: false`]"
+  ansible.builtin.set_fact:
+    junit2json_reports_list: "{{ junit2json_reports_list + [path_item] }}"
+  when:
+    - not(_junit2json_path_item_stat.stat.isdir | default(false))
+
+- name: "Find JUnit XML reports under path_item [`stat.isdir: true`]"
+  ansible.builtin.find:
+    paths: "{{ path_item }}"
+    patterns: "{{ global_reports_path_patterns }}"
+    recurse: false
+  register: _junit2json_xml_reports_find
+  when:
+    - _junit2json_path_item_stat.stat.isdir | default(false)
+
+- name: Setup the conversion list
+  ansible.builtin.set_fact:
+    junit2json_found_xml_reports: "{{ _junit2json_xml_reports_find.files | map(attribute='path') | list }}"
+  when:
+    - _junit2json_path_item_stat.stat.isdir | default(false)
+    - _junit2json_xml_reports_find.matched > 0
+
+- name: Setup the default list for conversion
+  ansible.builtin.set_fact:
+    junit2json_reports_list: "{{ junit2json_reports_list + junit2json_found_xml_reports }}"
+  when:
+    - _junit2json_path_item_stat.stat.isdir | default(false)
+    - junit2json_found_xml_reports | length > 0
