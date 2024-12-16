@@ -1,0 +1,33 @@
+---
+# arguments spec file for redhatci.ocp.junit2json role
+argument_specs:
+  main:
+    short_description: Main entry point for role redhatci.ocp.junit2json
+    description: |
+      This is the main entrypoint for the role.
+      It finds all the XML reports under `junit2json_reports_path`
+      matching any of `junit2json_reports_path_patterns` patterns.
+      Then they are converted into single JSoN report.
+      The resulting JSON should have unified format for all the teams' and tests
+    author:
+      - Max Kovgan
+    options:
+      junit2json_reports_path:
+        type: str
+        required: true
+        description:
+          - The path to the folder containing XML report(s)
+      junit2json_result_json_path:
+        type: str
+        required: false
+        default: "{{ junit2json_reports_path }}/report.junit.json"
+        description: |
+          Resulting report JSON file path
+      junit2json_do_merge:
+        type: bool
+        required: false
+        default: true
+        description: |
+          When `true` the merging of reports is done, and resulting json is `junit2json_result_json_path`.
+          Otherwise each report is converted to a corresponding json file,
+          and the value of the variable `junit2json_result_json_path` is ignored.
