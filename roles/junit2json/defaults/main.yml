@@ -1,0 +1,17 @@
+---
+# defaults file for role redhatci.ocp.junit2json
+
+################################################################################
+# NOTE: The mandatory variables are commented out, for more information
+#       refer to meta/argument_spec.yml
+################################################################################
+# junit2json_reports_path: str - mandatory parameter containing xml files
+junit2json_hash: sha256
+junit2json_supported_archives:
+  - "zip"
+junit2json_result_json_path: "{{ junit2json_reports_path }}/report.junit.json"
+junit2json_do_merge: true
+junit2json_result_xml_path: "{{ junit2json_reports_path }}/report.merged.xml"
+# Debug variables:
+
+junit2json_debug: false

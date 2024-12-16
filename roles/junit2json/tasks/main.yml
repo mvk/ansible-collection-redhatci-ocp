@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# tasks file for role redhatci.ocp.junit2json
+
+- name: "Loop orientation at idx {{ loop_idx }} out of {{ _found_reports.files | list | length }}"  # noqa name[template]
+  ansible.builtin.debug:
+    msg: "{{ item }}"
+
+- name: Validate some variables
+  ansible.builtin.assert:
+    that: "{{ condition }}"
+  loop:
+    - global_reports_path_patterns | length > 0
+    - junit2json_reports_path | length > 0
+    - junit2json_result_json_path | length > 0
+  loop_control:
+    loop_var: condition
+
+- name: Check whether the junit2json_reports_path is a directory
+  ansible.builtin.stat:
+    path: "{{ junit2json_reports_path }}"
+  register: _junit2json_reports_path_stat
+
+- name: Create helper variables
+  ansible.builtin.set_fact:
+    junit2json_find_patterns: "{{ global_reports_path_patterns | map('regex_replace', '^', '*.') | list }}"
+    junit2json_rename_pattern: "(.{{ junit2json_supported_archives | join('$|.') }}$)"
+    # cacheable: false
+
+- name: Find JUnit XML reports
+  ansible.builtin.find:
+    paths: "{{ junit2json_reports_path }}"
+    patterns: "{{ global_reports_path_patterns }}"
+    recurse: true
+  register: _junit2json_found_xml_reports
+  when:
+    - _junit2json_reports_path_stat.stat.isdir
+
+- name: Setup the default list for conversion
+  ansible.builtin.set_fact:
+    junit2json_xml_reports: "{{ _junit2json_found_xml_reports.files | map(attribute='path') | list }}"
+  when:
+    - _junit2json_reports_path_stat.stat.isdir
+
+- name: Setup the default list for conversion
+  ansible.builtin.set_fact:
+    junit2json_xml_reports: "{{ [junit2json_reports_path] }}"
+  when:
+    - not(_junit2json_reports_path_stat.stat.isdir)
+
+- name: Merge multiple mini-reports to one XML
+  ansible.builtin.include_tasks:
+    file: merge.yml
+  when:
+    - junit2json_do_merge
+    - _junit2json_found_xml_reports.matched > 0
+
+# - name: Ensure we have anything to convert
+#   ansible.builtin.assert:
+#     that: "{{ condition }}"
+#   loop_control:
+#     loop_var: condition
+#   loop:
+#     - junit2json_xml_reports | length > 0
+
+- name: Convert XML to JSON
+  ansible.builtin.include_tasks:
+    file: convert.yml
+  loop: "{{ junit2json_xml_reports }}"
+  loop_control:
+    loop_var: xml_report
+  when:
+    - junit2json_xml_reports | length > 0

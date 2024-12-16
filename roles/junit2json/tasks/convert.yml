@@ -1,0 +1,103 @@
+---
+# tasks file for redhatci.ocp.junit2json
+# task list: convert.yml consolidates multiple XMLs into 1 and converts it into JSoN
+
+# the variable is: xml_report
+
+- name: Read file content
+  ansible.builtin.set_fact:
+    junit2json_xml_report_content: "{{ lookup('ansible.builtin.file', xml_report) }}"
+
+- name: Generate content hash from the content
+  ansible.builtin.set_fact:
+    junit2json_xml_report_hash_path: "{{ xml_report }}.{{ junit2json_hash }}"
+    junit2json_xml_report_hash_curr: "{{ junit2json_xml_report_content | ansible.builtin.hash(junit2json_hash) }}"
+    junit2json_xml_report_hash_old: ""
+
+# debug only:
+- name: Print curr XML report filename
+  ansible.builtin.debug:
+    msg:
+      - "XML report path is: {{ xml_report }}"
+  # when:
+  #   - junit2json_debug
+
+- name: Obtain info on previous content checksum file
+  ansible.builtin.stat:
+    path: "{{ junit2json_xml_report_hash_path }}"
+    checksum_algorithm: "{{ junit2json_hash }}"
+  register: _junit2json_old_hash_stat
+
+- name: "Update junit2json_result_data [junit2json_do_merge: {{ junit2json_do_merge }}]"
+  ansible.builtin.set_fact:
+    junit2json_result_data: "{{ _junit2json_merged_xml.stdout | redhatci.ocp.junit2obj | to_nice_json }}"
+  when:
+    - junit2json_do_merge
+
+# - name: Print value of content in xml
+#   debug:
+#     var: junit2json_xml_report_content
+
+- name: Convert junit XML to JSON and save in junit2json_result_data
+  ansible.builtin.set_fact:
+    junit2json_result_data: "{{ junit2json_xml_report_content | redhatci.ocp.junit2obj | to_nice_json }}"
+  when:
+    - not(junit2json_do_merge)
+
+# - name: Print type of the resulting data
+#   ansible.builtin.debug:
+#     msg: "type of the 'junit2json_result_data' variable is: {{ junit2json_result_data | ansible.builtin.type_debug }}"
+
+  # when:
+  #   - junit2json_debug
+
+# - name: Print type of the resulting data
+#   ansible.builtin.debug:
+#     var: junit2json_result_data
+
+- name: Setup JSoN report file name (with extension .xml)
+  ansible.builtin.set_fact:
+    junit2json_json_report_path: "{{ xml_report | regex_replace('\\.xml$', '.json') }}"
+  when:
+    - xml_report.endswith(".xml")
+
+- name: Setup JSoN report file name (with extension .xml)
+  ansible.builtin.set_fact:
+    junit2json_json_report_path: "{{ xml_report + '.json' }}"
+  when:
+    - not(xml_report.endswith(".xml"))
+
+- name: Update xml_old_hash
+  ansible.builtin.set_fact:
+    junit2json_xml_report_hash_old: "{{ _junit2json_old_hash_stat.stat.checksum }}"
+  when:
+    - _junit2json_old_hash_stat.stat.exists
+
+- name: Update global_json_reports_list
+  ansible.builtin.set_fact:
+    global_json_reports_list: "{{ global_json_reports_list | default([]) + [junit2json_json_report_path] }}"
+
+- name: Ensure json data destination folder
+  ansible.builtin.file:
+    path: "{{ junit2json_json_report_path | dirname }}"
+    state: directory
+    mode: '0755'
+  when:
+    - junit2json_do_merge
+    - junit2json_xml_report_hash_curr != junit2json_xml_report_hash_old
+
+- name: Write json data to destination
+  ansible.builtin.copy:
+    content: "{{ junit2json_result_data | from_json | to_nice_json }}"
+    dest: "{{ junit2json_json_report_path }}"
+    mode: '0644'
+  when:
+    - junit2json_xml_report_hash_curr != junit2json_xml_report_hash_old
+
+- name: Write current hash to destination
+  ansible.builtin.copy:
+    content: "{{ junit2json_xml_report_hash_curr }}"
+    dest: "{{ junit2json_xml_report_hash_path }}"
+    mode: '0644'
+  when:
+    - junit2json_xml_report_hash_curr != junit2json_xml_report_hash_old

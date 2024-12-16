@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  roles:
+    - name: junit2json
+      vars:
+        j2j_reports_path: "{{ roles_path }}/junit2json/tests/system-tests/reports_good"
+        j2j_reports_path_patterns:
+        - "*.xml"
+        j2j_xml_parse_path: "{{ roles_path }}/junit2json/tests/system-tests/xml_parse.yml"
