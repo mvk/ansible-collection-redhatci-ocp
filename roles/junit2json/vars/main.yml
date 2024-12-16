@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# vars file for role `redhatci.ocp.junit2json`
+
+
+# required only `junit2json_do_merge` is true:
+# junit2json_input_merged_report:
+# junit2json_output_merged_report:
+
+# always required:
+# junit2json_input_reports_list:
+# junit2json_output_dir:
