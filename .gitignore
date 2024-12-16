@@ -1,5 +1,16 @@
 *.tar.gz
+*.zip
 roles/**/.linted
 .docsible
 tests/output
 __pycache__
+.venv
+.vscode
+*.swp
+*.swo
+*.swn
+.docsible
+*~
+\#*
+\#*\#
+.DS_Store
