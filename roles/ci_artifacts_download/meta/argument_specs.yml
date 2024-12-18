@@ -2,33 +2,47 @@
 ---
 argument_specs:
   main:
-    short_description: redhat.ocp.ci_artifacts_download
+    short_description: Main entry point for role redhat.ocp.ci_artifacts_download
     description:
-      - This is the main entrypoint for the redhat.ocp.ci_artifacts_download role.
-      - It downloads last `jobs` of ci jobs of type `job_type` and unpacks them.
+      - The role downloads builds artifacts from CI server.
+      - It puts all the builds artifacts under '{{ cad_target_path }}/{{ global_ci_type }}'
     author:
       - Max Kovgan
     options:
-      cad_jobs_map:
-        type: "dict"
+      global_ci_server_url:
+        type: "str"
         required: true
-        description:
-          - The map of ci_artifacts_downloader configuration.
+        description: >
+          CI Server URL
+      global_ci_type:
+        type: "str"
+        required: true
+        description: >
+          CI server type. supported: ["jenkins"]
       cad_job_profile:
         type: "str"
         default: "functional-tests"
         required: false
         description:
           - Team profile, determines which cad_jobs_map configuration key to use
+      global_last_builds:
+        type: list
+        elements: dict
+        default: []
+        required: false
+        description: >
+          List of job information to fetch. List of dicts:
+          ```
+          global_last_builds:
+            - path: /job/bla-compute-4.16
+              builds: 2
+            - path: /view/ABC/job/DEF/job/bla-storage-4.17
+              builds: 15
+          ```
+          will ensure last 2 of the 1st and 15 of the 2nd will be downloaded
       cad_target_path:
         type: "str"
         required: false
-        default: "{{ playbook_dir }}/{{ role_name }}/downloads"
+        default: "{{ playbook_dir }}/downloads"
         description:
           - Where to download jobs' archives
-      cad_last_builds:
-        type: "int"
-        default: 10
-        required: false
-        description:
-          - How many job last builds artifacts to download

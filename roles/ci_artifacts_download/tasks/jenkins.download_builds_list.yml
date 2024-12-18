@@ -8,6 +8,26 @@
     state: directory
     mode: '0755'
 
+
+# occasionally there are these:
+# (
+#   item={
+#     '_class': 'org.jenkinsci.plugins.workflow.job.WorkflowRun',
+#     'number': 65,
+#     'url': 'https://jenkins-server.domain.com/view/View1/job/Job/job/cool-compute-4.18/65/'
+#   }
+# ) => {
+#   "ansible_loop_var": "build_info",
+#   "build_info": {
+#     "_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
+#     "number": 65,
+#     'url': 'https://jenkins-server.domain.com/view/View1/job/Job/job/cool-compute-4.18/65/'
+#   },
+#   "changed": false,
+#   "elapsed": 0,
+#   "msg": "failed to create temporary content file: The read operation timed out"
+# }
+
 - name: Download builds artifacts
   ansible.builtin.get_url:
     url: "{{ build_info.url }}artifact/*zip*/{{ build_info.url | urlsplit('path') | regex_replace('^/|/$', '') | replace('/', '-') }}.zip"
@@ -18,7 +38,12 @@
     # headers:
     #   Content-Type: application/x-www-form-urlencoded
     dest: "{{ cad_download_root }}"
+    timeout: "{{ cad_timeout }}"
+    unsafe_writes: true
     mode: '0644'
+  register: get_url_results
   loop: "{{ builds_info.json.builds }}"
   loop_control:
     loop_var: build_info
+  retries: 3
+  delay: 2

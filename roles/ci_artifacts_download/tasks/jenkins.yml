@@ -5,34 +5,34 @@
 - name: Setup cad_jobs map
   ansible.builtin.set_fact:
     cad_jobs: []
-    cad_download_root: "{{ cad_target_path }}/{{ cad_curr_jobs_map.type }}"
+    cad_download_root: "{{ cad_target_path }}/{{ global_ci_type }}"
 
 
-- name: Print jobs map
-  ansible.builtin.debug:
-    msg:
-      - "cad_curr_jobs_map: {{ cad_curr_jobs_map }}"
-      - "cad_download_root: {{ cad_download_root }}"
-  when:
-    - role_debug is defined
-    - role_debug
+# - name: Print jobs map
+#   ansible.builtin.debug:
+#     msg:
+#       - "cad_curr_jobs_map: {{ cad_curr_jobs_map }}"
+#       - "cad_download_root: {{ cad_download_root }}"
+#   when:
+#     - role_debug is defined
+#     - role_debug
 
-- name: Setup jobs list
-  ansible.builtin.set_fact:
-    cad_jobs: "{{ cad_jobs + [cad_curr_jobs_map.server_url + item] }}"
-  loop: "{{ cad_curr_jobs_map.jobs }}"
+# - name: Setup jobs list
+#   ansible.builtin.set_fact:
+#     cad_jobs: "{{ cad_jobs + [cad_curr_jobs_map.server_url + item.path] }}"
+#   loop: "{{ global_last_builds }}"
 
 
-- name: Print jobs map
-  ansible.builtin.debug:
-    msg: "cad_jobs: {{ cad_jobs }}"
-  when:
-    - role_debug is defined
-    - role_debug
+# - name: Print jobs map
+#   ansible.builtin.debug:
+#     msg: "cad_jobs: {{ cad_jobs }}"
+#   when:
+#     - role_debug is defined
+#     - role_debug
 
 - name: Sanity jenkins access check
   ansible.builtin.uri:
-    url: "{{ cad_jobs[0] }}/api/json?pretty=true"
+    url: "{{ global_ci_server_url }}{{ global_last_builds[0].path }}/api/json?pretty=true"
     method: GET
     validate_certs: false
     # user: "{{ cad_username }}"
@@ -51,7 +51,7 @@
 
 - name: Get list of last cad_jobs jenkins builds
   ansible.builtin.uri:
-    url: "{{ item }}/api/json?tree=builds[number,url]{0,{{ cad_last_builds }}}&pretty=true"
+    url: "{{ global_ci_server_url }}{{ item.path }}/api/json?tree=builds[number,url]{0,{{ item.builds }}}&pretty=true"
     method: GET
     validate_certs: false
     # user: "{{ cad_username }}"
@@ -63,7 +63,7 @@
     # headers:
     #   Content-Type: application/x-www-form-urlencoded
   register: _cad_jobs_builds_infos
-  loop: "{{ cad_jobs | list }}"
+  loop: "{{ global_last_builds | list }}"
 
 - name: Download artifacts list in an organized manner
   ansible.builtin.include_tasks:
