@@ -1,0 +1,73 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# jenkins playbook for role redhatci.ocp.ci_artifacts_download
+
+- name: Setup cad_jobs map
+  ansible.builtin.set_fact:
+    cad_jobs: []
+    cad_download_root: "{{ cad_target_path }}/{{ cad_curr_jobs_map.type }}"
+
+
+- name: Print jobs map
+  ansible.builtin.debug:
+    msg:
+      - "cad_curr_jobs_map: {{ cad_curr_jobs_map }}"
+      - "cad_download_root: {{ cad_download_root }}"
+  when:
+    - role_debug is defined
+    - role_debug
+
+- name: Setup jobs list
+  ansible.builtin.set_fact:
+    cad_jobs: "{{ cad_jobs + [cad_curr_jobs_map.server_url + item] }}"
+  loop: "{{ cad_curr_jobs_map.jobs }}"
+
+
+- name: Print jobs map
+  ansible.builtin.debug:
+    msg: "cad_jobs: {{ cad_jobs }}"
+  when:
+    - role_debug is defined
+    - role_debug
+
+- name: Sanity jenkins access check
+  ansible.builtin.uri:
+    url: "{{ cad_jobs[0] }}/api/json?pretty=true"
+    method: GET
+    validate_certs: false
+    # user: "{{ cad_username }}"
+    # password: "{{ cad_token }}"
+    # force_basic_auth: true
+    status_code: [200, 201]
+  register: _cad_connectivity
+
+- name: Fail if the connectivity to jenkins is broken
+  ansible.builtin.fail:
+    msg:
+      - "Failed at test connection to jenkins: {{ _cad_connectivity.url }}"
+      - "Check your connectivity or VPN"
+  failed_when:
+    - not(_cad_connectivity.status in [200, 201])
+
+- name: Get list of last cad_jobs jenkins builds
+  ansible.builtin.uri:
+    url: "{{ item }}/api/json?tree=builds[number,url]{0,{{ cad_last_builds }}}&pretty=true"
+    method: GET
+    validate_certs: false
+    # user: "{{ cad_username }}"
+    # password: "{{ cad_token }}"
+    # force_basic_auth: true
+    # body_format: "{{ cad_body_format | default('form-urlencoded') }}"
+    status_code: [200, 201]
+    # body: "{{ cad_job_params }}"
+    # headers:
+    #   Content-Type: application/x-www-form-urlencoded
+  register: _cad_jobs_builds_infos
+  loop: "{{ cad_jobs | list }}"
+
+- name: Download artifacts list in an organized manner
+  ansible.builtin.include_tasks:
+    file: "jenkins.download_builds_list.yml"
+  loop: "{{ _cad_jobs_builds_infos.results }}"
+  loop_control:
+    loop_var: builds_info

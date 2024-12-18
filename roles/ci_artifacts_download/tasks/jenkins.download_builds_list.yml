@@ -1,0 +1,24 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# this task list downloads artifacts for role redhatci.ocp.ci_artifacts_download
+
+- name: Ensure builds artifacts containing folder
+  ansible.builtin.file:
+    path: "{{ cad_download_root }}"
+    state: directory
+    mode: '0755'
+
+- name: Download builds artifacts
+  ansible.builtin.get_url:
+    url: "{{ build_info.url }}artifact/*zip*/{{ build_info.url | urlsplit('path') | regex_replace('^/|/$', '') | replace('/', '-') }}.zip"
+    validate_certs: false
+    # user: "{{ cad_username }}"
+    # password: "{{ cad_token }}"
+    # force_basic_auth: true
+    # headers:
+    #   Content-Type: application/x-www-form-urlencoded
+    dest: "{{ cad_download_root }}"
+    mode: '0644'
+  loop: "{{ builds_info.json.builds }}"
+  loop_control:
+    loop_var: build_info

@@ -1,0 +1,20 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# tasks file for role redhatci.ocp.ci_artifacts_download
+
+- name: Setup fact cad_curr_jobs_map
+  ansible.builtin.set_fact:
+    cad_curr_jobs_map: "{{ cad_jobs_map[cad_job_profile] }}"
+
+- name: Fail upon unsupported CI type
+  ansible.builtin.fail:
+    msg: Validating CI type failed
+  when:
+    - "'type' in cad_curr_jobs_map"
+    - cad_curr_jobs_map.type in ['jenkins', 'dci']
+
+- name: "Get artifacts of jobs from {{ cad_curr_jobs_map.type }}"
+  ansible.builtin.include_tasks:
+    file: "{{ cad_curr_jobs_map.type }}.yml"
+  when:
+    - "'type' in cad_curr_jobs_map"

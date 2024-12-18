@@ -1,0 +1,7 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# defaults file for role redhatci.ocp.ci_artifacts_download
+
+cad_target_path: "{{ playbook_dir }}/{{ role_name }}/downloads"
+cad_last_builds: 5
+cad_job_profile: functional-tests
