@@ -3,9 +3,10 @@
 argument_specs:
   main:
     short_description: Main entry point for role redhat.ocp.ci_artifacts_download
-    description:
-      - The role downloads builds artifacts from CI server.
-      - It puts all the builds artifacts under '{{ cad_target_path }}/{{ global_ci_type }}'
+    description: >
+      The role downloads builds artifacts from CI server.
+      
+      It puts all the builds artifacts under '{{ cad_target_path }}/{{ global_ci_type }}'
     author:
       - Max Kovgan
     options:
@@ -23,8 +24,8 @@ argument_specs:
         type: "str"
         default: "functional-tests"
         required: false
-        description:
-          - Team profile, determines which cad_jobs_map configuration key to use
+        description: >
+          Team profile, determines which cad_jobs_map configuration key to use
       global_last_builds:
         type: list
         elements: dict
@@ -44,5 +45,5 @@ argument_specs:
         type: "str"
         required: false
         default: "{{ playbook_dir }}/downloads"
-        description:
-          - Where to download jobs' archives
+        description: >
+          Where to download jobs' archives

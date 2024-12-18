@@ -6,12 +6,10 @@
 
 
 
-Description: downloader for job artifacts
+Description: Downloader role for CI job artifacts
 
 
-| Field                | Value           |
-|--------------------- |-----------------|
-| Readme update        | 16/12/2024 |
+
 
 
 
@@ -20,14 +18,27 @@ Description: downloader for job artifacts
 <summary><b>🧩 Argument Specifications in meta/argument_specs</b></summary>
 
 #### Key: main 
-**Description**: ['This is the main entrypoint for the redhat.ocp.ci_artifacts_download role.', 'It downloads last `jobs` of ci jobs of type `job_type` and unpacks them.']
+**Description**: The role downloads builds artifacts from CI server.
+It puts all the builds artifacts under '{{ cad_target_path }}/{{ global_ci_type }}'
 
 
-  - **cad_jobs_map**
+
+  - **global_ci_server_url**
     - **Required**: True
-    - **Type**: dict
+    - **Type**: str
     - **Default**: none
-    - **Description**: ['The map of ci_artifacts_downloader configuration.']
+    - **Description**: CI Server URL
+
+  
+  
+  
+
+  - **global_ci_type**
+    - **Required**: True
+    - **Type**: str
+    - **Default**: none
+    - **Description**: CI server type. supported: ["jenkins"]
+
   
   
   
@@ -36,25 +47,35 @@ Description: downloader for job artifacts
     - **Required**: False
     - **Type**: str
     - **Default**: functional-tests
-    - **Description**: ['Team profile, determines which cad_jobs_map configuration key to use']
+    - **Description**: Team profile, determines which cad_jobs_map configuration key to use
+
   
   
+  
+
+  - **global_last_builds**
+    - **Required**: False
+    - **Type**: list
+    - **Default**: []
+    - **Description**: List of job information to fetch. List of dicts: ``` global_last_builds:
+  - path: /job/bla-compute-4.16
+    builds: 2
+  - path: /view/ABC/job/DEF/job/bla-storage-4.17
+    builds: 15
+``` will ensure last 2 of the 1st and 15 of the 2nd will be downloaded
+
+  
+  
+  
+    
   
 
   - **cad_target_path**
     - **Required**: False
     - **Type**: str
-    - **Default**: {{ playbook_dir }}/{{ role_name }}/downloads
-    - **Description**: ["Where to download jobs' archives"]
-  
-  
-  
+    - **Default**: {{ playbook_dir }}/downloads
+    - **Description**: Where to download jobs' archives
 
-  - **cad_last_builds**
-    - **Required**: False
-    - **Type**: int
-    - **Default**: 10
-    - **Description**: ['How many job last builds artifacts to download']
   
   
   
@@ -72,9 +93,10 @@ Description: downloader for job artifacts
 
 | Var          | Type         | Value       |Required    | Title       |
 |--------------|--------------|-------------|-------------|-------------|
-| [cad_target_path](defaults/main.yml#L5)   | str   | `{{ playbook_dir }}/{{ role_name }}/downloads` |    n/a  |  n/a |
-| [cad_last_builds](defaults/main.yml#L6)   | int   | `5` |    n/a  |  n/a |
-| [cad_job_profile](defaults/main.yml#L7)   | str   | `functional-tests` |    n/a  |  n/a |
+| [cad_job_profile](defaults/main.yml#L5)   | str   | `functional-tests` |    n/a  |  n/a |
+| [cad_target_path](defaults/main.yml#L6)   | str   | `{{ playbook_dir }}/downloads` |    n/a  |  n/a |
+| [global_last_builds](defaults/main.yml#L7)   | list   | `[]` |    n/a  |  n/a |
+| [cad_timeout](defaults/main.yml#L8)   | int   | `15` |    n/a  |  n/a |
 
 
 
@@ -88,9 +110,6 @@ Description: downloader for job artifacts
 | Name | Module | Has Conditions |
 | ---- | ------ | --------- |
 | Setup cad_jobs map | ansible.builtin.set_fact | False |
-| Print jobs map | ansible.builtin.debug | True |
-| Setup jobs list | ansible.builtin.set_fact | False |
-| Print jobs map | ansible.builtin.debug | True |
 | Sanity jenkins access check | ansible.builtin.uri | False |
 | Fail if the connectivity to jenkins is broken | ansible.builtin.fail | False |
 | Get list of last cad_jobs jenkins builds | ansible.builtin.uri | False |
@@ -113,9 +132,9 @@ Description: downloader for job artifacts
 
 | Name | Module | Has Conditions |
 | ---- | ------ | --------- |
-| Setup fact cad_curr_jobs_map | ansible.builtin.set_fact | False |
-| Fail upon unsupported CI type | ansible.builtin.fail | True |
-| Get artifacts of jobs from {{ cad_curr_jobs_map.type }} | ansible.builtin.include_tasks | True |
+| Validate variables have loaded properly from vars file | ansible.builtin.assert | False |
+| Validate global_ci_type | ansible.builtin.assert | False |
+| Get artifacts of jobs from {{ global_ci_type }} | ansible.builtin.include_tasks | False |
 
 
 
