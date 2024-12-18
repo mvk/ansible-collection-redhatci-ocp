@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# arguments spec file for redhat.ocp.ci_artifacts_unpack role
+argument_specs:
+  main:
+    short_description: Main entry point of role redhat.ocp.ci_artifacts_unpack
+    description:
+      - This is the companion role for `redhatci.ocp.ci_artifacts_download`.
+      - It scans the download folder for archives, and unpacks them incl. internal archives.
+    author:
+      - Max Kovgan
+    options:
+      cau_target_path:
+        type: "str"
+        required: true
+        description:
+          - Where reside jobs' archives
+      cau_job_profile:
+        type: "str"
+        default: "functional-tests"
+        required: false
+        description:
+          - Team profile, determines which configuration key to use
+      cau_supported_archives:
+        type: "list"
+        elements: "str"
+        required: false
+        default: ["zip"]
+        description:
+          - Where to download jobs' archives

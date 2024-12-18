@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# find.unpack file for role redhatci.ocp.ci_artifacts_unpack
+
+- name: Print variables
+  ansible.builtin.debug:
+    msg:
+      - path_item: "{{ path_item }}"
+      - cau_find_patterns: "{{ cau_find_patterns }}"
+
+- name: Find artifact archives
+  ansible.builtin.find:
+    paths: "{{ path_item }}"
+    patterns: "{{ cau_find_patterns }}"
+    recurse: true
+  register: _cau_artifact_found_archives
+
+- name: Create folders for found archives
+  ansible.builtin.file:
+    path: "{{ file_item.path | regex_replace(cau_rename_pattern, '') }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ _cau_artifact_found_archives.files }}"
+  loop_control:
+    loop_var: file_item
+  when:
+    - _cau_artifact_found_archives.matched > 0
+
+- name: Unpack artifacts in their folder
+  ansible.builtin.unarchive:
+    src: "{{ file_item.path }}"
+    dest: "{{ file_item.path | regex_replace(cau_rename_pattern, '') }}"
+    remote_src: true
+    include: "{{ cau_reports_path_patterns | default(['*.xml']) | list }}"
+  loop: "{{ _cau_artifact_found_archives.files }}"
+  loop_control:
+    loop_var: file_item
+  register: _cau_unpacked_artifacts_results
+  failed_when:
+    - false

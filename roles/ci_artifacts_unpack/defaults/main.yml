@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# defaults file for role redhatci.ocp.ci_artifacts_unpack
+
+cau_job_profile: "functional-tests"
+cau_supported_archives:
+  - "zip"
+cau_reports_path_patterns:
+  - "*.xml"

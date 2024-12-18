@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+# tasks file for role redhatci.ocp.ci_artifacts_unpack
+
+- name: Print input parameters
+  ansible.builtin.debug:
+    msg: "{{ item }}"
+  loop:
+    - "cau_target_path: {{ cau_target_path }}"
+    - "cau_reports_path_patterns: {{ cau_reports_path_patterns }}"
+    - "cau_supported_archives: {{ cau_supported_archives }}"
+
+- name: Create helper variables
+  ansible.builtin.set_fact:
+    cau_find_patterns: "{{ cau_supported_archives | map('regex_replace', '^', '*.') | list }}"
+    cau_rename_pattern: "(.{{ cau_supported_archives | join('$|.') }}$)"
+    cacheable: false
+
+- name: Create unarchive patterns list
+  ansible.builtin.set_fact:
+    cau_unarchive_patterns: "{{ cau_unarchive_patterns | default([]) + ['*.' + item] }}"
+  loop: "{{ cau_supported_archives }}"
+
+- name: Update unarchive patterns list
+  ansible.builtin.set_fact:
+    cau_unarchive_patterns: "{{ cau_reports_path_patterns + cau_unarchive_patterns }}"
+
+- name: Find top archives
+  ansible.builtin.find:
+    paths: "{{ cau_target_path }}"
+    patterns: "{{ cau_find_patterns }}"
+    recurse: false
+  register: _cau_found_archives
+
+- name: Create artifacts folders
+  ansible.builtin.file:
+    path: "{{ file_item.path | regex_replace(cau_rename_pattern, '') }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ _cau_found_archives.files }}"
+  loop_control:
+    loop_var: file_item
+  when:
+    - _cau_found_archives.matched > 0
+
+- name: Unpack artifact in folder
+  ansible.builtin.unarchive:
+    src: "{{ file_item.path }}"
+    dest: "{{ file_item.path | regex_replace(cau_rename_pattern, '') }}"
+    remote_src: true
+    include: "{{ cau_unarchive_patterns | default(['*.xml']) | list }}"
+  loop: "{{ _cau_found_archives.files }}"
+  loop_control:
+    loop_var: file_item
+  register: _cau_unpacked_artifacts_results
+  failed_when:
+    - false
+
+- name: Find and unpack internal artifact's archives
+  ansible.builtin.include_tasks:
+    file: find.unpack.yml
+  loop: "{{ _cau_found_archives.files | map(attribute='path') | map('regex_replace', cau_rename_pattern, '') | list }}"
+  loop_control:
+    loop_var: path_item
+  when:
+    - _cau_found_archives.matched > 0
