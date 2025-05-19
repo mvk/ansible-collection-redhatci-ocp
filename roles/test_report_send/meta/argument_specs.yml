@@ -13,7 +13,7 @@ argument_specs:
 
       trs_report_path:
         type: str
-        required: true
+        required: false
         description: |
           Test report JSON file to send.
           Merged into the event under 'test' attribute.
@@ -35,8 +35,30 @@ argument_specs:
         description: >
           The URL of collector server (Splunk).
 
-      trs_collector_auth_headers:
-        type: dict
+      trs_collector_auth_token:
+        type: str
         required: true
         description: >
-          Authentication headers against the collector server (Splunk).
+          Collector auth token string as for basic http auth
+
+      trs_collector_target:
+        type: str
+        required: true
+        description: >
+          Collector Target/Channel/Topic/Id
+
+      trs_collector_type:
+        type: str
+        required: false
+        default: splunk
+        description: >
+          Collector type (currently only `splunk` is supported)
+
+      trs_supported_collector_types:
+        type: list
+        elements: str
+        required: false
+        default:
+          - splunk
+        description: |
+          Supported collectors types list

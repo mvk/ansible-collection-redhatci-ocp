@@ -9,7 +9,9 @@
 Description: Push data file to collector
 
 
-
+| Field                | Value           |
+|--------------------- |-----------------|
+| Readme update        | 21/05/2025 |
 
 
 
@@ -25,7 +27,7 @@ It sends data to the collector, currently only splunk is supported.
 
 
   - **trs_report_path**
-    - **Required**: True
+    - **Required**: False
     - **Type**: str
     - **Default**: none
     - **Description**: Test report JSON file to send.
@@ -59,11 +61,41 @@ If set to be empty or the file is missing, it is ignored.
   
   
 
-  - **trs_collector_auth_headers**
+  - **trs_collector_auth_token**
     - **Required**: True
-    - **Type**: dict
+    - **Type**: str
     - **Default**: none
-    - **Description**: Authentication headers against the collector server (Splunk).
+    - **Description**: Collector auth token string as for basic http auth
+
+  
+  
+  
+
+  - **trs_collector_target**
+    - **Required**: True
+    - **Type**: str
+    - **Default**: none
+    - **Description**: Collector Target/Channel/Topic/Id
+
+  
+  
+  
+
+  - **trs_collector_type**
+    - **Required**: False
+    - **Type**: str
+    - **Default**: splunk
+    - **Description**: Collector type (currently only `splunk` is supported)
+
+  
+  
+  
+
+  - **trs_supported_collector_types**
+    - **Required**: False
+    - **Type**: list
+    - **Default**: ['splunk']
+    - **Description**: Supported collectors types list
 
   
   
@@ -82,7 +114,11 @@ If set to be empty or the file is missing, it is ignored.
 
 | Var          | Type         | Value       |Required    | Title       |
 |--------------|--------------|-------------|-------------|-------------|
-| [trs_metadata_path](defaults/main.yml#L5)   | str   | `` |    n/a  |  n/a |
+| [trs_report_path](defaults/main.yml#L5)   | str   | `` |    n/a  |  n/a |
+| [trs_metadata_path](defaults/main.yml#L6)   | str   | `` |    n/a  |  n/a |
+| [trs_collector_type](defaults/main.yml#L7)   | str   | `splunk` |    n/a  |  n/a |
+| [trs_supported_collector_types](defaults/main.yml#L8)   | list   | `['splunk']` |    n/a  |  n/a |
+| [trs_ci_system](defaults/main.yml#L11)   | str   | `unknown` |    n/a  |  n/a |
 
 
 
@@ -91,66 +127,115 @@ If set to be empty or the file is missing, it is ignored.
 ### Tasks
 
 
+#### File: tasks/ci.detect.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Define default CI system name | ansible.builtin.set_fact | False |
+| Set DCI as trs_ci_system | ansible.builtin.set_fact | True |
+| Set Prow as trs_ci_system | ansible.builtin.set_fact | True |
+| Set Jenkins as trs_ci_system | ansible.builtin.set_fact | True |
+| Set GitHub as trs_ci_system | ansible.builtin.set_fact | True |
+| Set GitLab as trs_ci_system | ansible.builtin.set_fact | True |
+
+#### File: tasks/metadata.detect.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Detect CI system | ansible.builtin.include_tasks | False |
+| Initialize metadata if empty | ansible.builtin.set_fact | False |
+| Detect dynamic metadata | ansible.builtin.include_tasks | False |
+| Update metadata | ansible.builtin.set_fact | False |
+| Update trs_collector_source for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+
 #### File: tasks/main.yml
 
 | Name | Module | Has Conditions |
 | ---- | ------ | --------- |
-| Verify all input variables are set | ansible.builtin.assert | False |
+| Update trs_report_path if not passed | ansible.builtin.set_fact | True |
+| Validate all required variables are defined | ansible.builtin.assert | False |
 | Collect trs_report_path file stat | ansible.builtin.stat | False |
 | Ensure trs_report_path file exists | ansible.builtin.assert | False |
-| Read content from test report JSON file | ansible.builtin.slurp | False |
-| Decode JSON content of test report file | ansible.builtin.set_fact | False |
 | Collect trs_metadata_path file stat | ansible.builtin.stat | True |
 | Read content of metadata JSON file | ansible.builtin.slurp | True |
 | Setup content for metadata file | ansible.builtin.set_fact | False |
 | Decode JSON content for metadata file | ansible.builtin.set_fact | True |
+| Detect Metadata from the env | ansible.builtin.include_tasks | False |
+| Send trs_data_event to collector {{ trs_collector_type }} | ansible.builtin.include_tasks | False |
+
+#### File: tasks/reporting/splunk.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Read content from test report JSON file | ansible.builtin.slurp | False |
+| Decode JSON content of test report file | ansible.builtin.set_fact | False |
+| Print current datetime | ansible.builtin.debug | False |
+| Setup timestamps broken down to int/float parts for {{ trs_collector_type }} | ansible.builtin.set_fact | False |
+| Setup timestamps as floats for reporting | ansible.builtin.set_fact | False |
+| Update trs_collector_auth_headers with trs_collector_auth_token from the user for {{ trs_collector_type }} | ansible.builtin.set_fact | True |
+| Update trs_collector_auth_headers with trs_event_channel from the user for {{ trs_collector_type }} | ansible.builtin.set_fact | True |
+| Dynamically detect metadata when it is missing | ansible.builtin.include_tasks | True |
 | Create event data attributes | ansible.builtin.set_fact | False |
-| Setup timestamps broken down to int/float parts | ansible.builtin.set_fact | False |
-| Setup timestamps as floats | ansible.builtin.set_fact | False |
-| Set event time if we have job_time | ansible.builtin.set_fact | True |
-| Print event data | ansible.builtin.debug | False |
-| Combine additional attributes into the data | ansible.builtin.set_fact | False |
+| Print event data before timestamp corrections | ansible.builtin.debug | False |
+| Combine additional attributes into the data at trs_collector_target for {{ trs_collector_type }} | ansible.builtin.set_fact | False |
 | Print payload data | ansible.builtin.debug | False |
-| Send data to collector | ansible.builtin.uri | False |
+| Send data to {{ trs_collector_type }} | ansible.builtin.uri | True |
+
+#### File: tasks/reporting/validations.splunk.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Validate collector connectivity var trs_collector_url is not empty | ansible.builtin.assert | False |
+| Validate collector connectivity var trs_collector_auth_headers is not empty | ansible.builtin.assert | False |
+| Validate collector var for splunk trs_collector_auth_headers has the required keys and values | ansible.builtin.assert | False |
+
+#### File: tasks/metadata.detect/jenkins.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Set is_ci attribute | ansible.builtin.set_fact | True |
+| Update trs_ci.type for {{ trs_ci_system }} | ansible.builtin.set_fact | False |
+| Update trs_ci.url for {{ trs_ci_system }} | ansible.builtin.set_fact | False |
+| Update trs_ci.job for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+
+#### File: tasks/metadata.detect/dci.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Set is_ci attribute | ansible.builtin.set_fact | True |
+| Update trs_ci.type for {{ trs_ci_system }} | ansible.builtin.set_fact | False |
+| Update trs_ci.url for {{ trs_ci_system }} | ansible.builtin.set_fact | False |
+
+#### File: tasks/metadata.detect/github.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Set is_ci attribute | ansible.builtin.set_fact | True |
+| Update trs_ci.type for {{ trs_ci_system }} | ansible.builtin.set_fact | False |
+| Update trs_ci.url for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+| Update trs_ci.pipeline for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+| Update trs_ci.job for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+| Update trs_ci.commit for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+
+#### File: tasks/metadata.detect/unknown.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Unsupported CI system | ansible.builtin.debug | False |
+| Fail the role | ansible.builtin.fail | False |
+
+#### File: tasks/metadata.detect/gitlab.yml
+
+| Name | Module | Has Conditions |
+| ---- | ------ | --------- |
+| Set is_ci attribute | ansible.builtin.set_fact | True |
+| Update trs_ci.type for {{ trs_ci_system }} | ansible.builtin.set_fact | False |
+| Update trs_ci.url for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+| Update trs_ci.pipeline for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+| Update trs_ci.job for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
+| Update trs_ci.commit for {{ trs_ci_system }} | ansible.builtin.set_fact | True |
 
 
-## Task Flow Graphs
-
-
-
-### Graph for main.yml
-
-```mermaid
-flowchart TD
-Start
-classDef block stroke:#3498db,stroke-width:2px;
-classDef task stroke:#4b76bb,stroke-width:2px;
-classDef includeTasks stroke:#16a085,stroke-width:2px;
-classDef importTasks stroke:#34495e,stroke-width:2px;
-classDef includeRole stroke:#2980b9,stroke-width:2px;
-classDef importRole stroke:#699ba7,stroke-width:2px;
-classDef includeVars stroke:#8e44ad,stroke-width:2px;
-classDef rescue stroke:#665352,stroke-width:2px;
-
-  Start-->|Task| Verify_all_input_variables_are_set0[verify all input variables are set]:::task
-  Verify_all_input_variables_are_set0-->|Task| Collect_trs_report_path_file_stat1[collect trs report path file stat]:::task
-  Collect_trs_report_path_file_stat1-->|Task| Ensure_trs_report_path_file_exists2[ensure trs report path file exists]:::task
-  Ensure_trs_report_path_file_exists2-->|Task| Read_content_from_test_report_JSON_file3[read content from test report json file]:::task
-  Read_content_from_test_report_JSON_file3-->|Task| Decode_JSON_content_of_test_report_file4[decode json content of test report file]:::task
-  Decode_JSON_content_of_test_report_file4-->|Task| Collect_trs_metadata_path_file_stat5[collect trs metadata path file stat<br>When: **trs metadata path   default       length   0**]:::task
-  Collect_trs_metadata_path_file_stat5-->|Task| Read_content_of_metadata_JSON_file6[read content of metadata json file<br>When: **trs metadata path stat stat isreg   default false<br>**]:::task
-  Read_content_of_metadata_JSON_file6-->|Task| Setup_content_for_metadata_file7[setup content for metadata file]:::task
-  Setup_content_for_metadata_file7-->|Task| Decode_JSON_content_for_metadata_file8[decode json content for metadata file<br>When: **trs metadata file content content   default      <br>length   0**]:::task
-  Decode_JSON_content_for_metadata_file8-->|Task| Create_event_data_attributes9[create event data attributes]:::task
-  Create_event_data_attributes9-->|Task| Setup_timestamps_broken_down_to_int_float_parts10[setup timestamps broken down to int float parts]:::task
-  Setup_timestamps_broken_down_to_int_float_parts10-->|Task| Setup_timestamps_as_floats11[setup timestamps as floats]:::task
-  Setup_timestamps_as_floats11-->|Task| Set_event_time_if_we_have_job_time12[set event time if we have job time<br>When: **trs job time int   int    0**]:::task
-  Set_event_time_if_we_have_job_time12-->|Task| Print_event_data13[print event data]:::task
-  Print_event_data13-->|Task| Combine_additional_attributes_into_the_data14[combine additional attributes into the data]:::task
-  Combine_additional_attributes_into_the_data14-->|Task| Print_payload_data15[print payload data]:::task
-  Print_payload_data15-->|Task| Send_data_to_collector16[send data to collector]:::task
-  Send_data_to_collector16-->End
-```
 
 
 ## Playbook
@@ -164,11 +249,7 @@ classDef rescue stroke:#665352,stroke-width:2px;
       
 
 ```
-## Playbook graph
-```mermaid
-flowchart TD
-  localhost-->|Role| test_report_send[test report send]
-```
+
 
 ## Author Information
 Max Kovgan, Cesare Placanica
