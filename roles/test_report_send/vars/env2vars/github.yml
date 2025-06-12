@@ -1,0 +1,15 @@
+---
+
+env2vars:
+  - key: ci_server_url
+    var: GITHUB_SERVER_URL
+  - key: ci_workspace
+    var: GITHUB_WORKSPACE
+  - key: ci_runner_name
+    var: RUNNER_NAME
+  - key: ci_runner_specs
+    var: RUNNER_LABELS
+    var_type: dict
+    splitter:
+      - ' '
+      - ':'
