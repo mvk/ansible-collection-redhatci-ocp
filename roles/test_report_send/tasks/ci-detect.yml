@@ -16,6 +16,13 @@
     - trs_ci_system == "unknown"
     - lookup("env", "JENKINS_URL") | length > 0
 
+- name: Recognize trs_ci_system as Prow
+  ansible.builtin.set_fact:
+    trs_ci_system: prow
+  when:
+    - trs_ci_system == "unknown"
+    - lookup("env", "PROW_JOB_ID") | length > 0
+
 - name: Validating trs_ci_system is supported
   ansible.builtin.assert:
     that: "{{ condition }}"
