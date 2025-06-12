@@ -9,6 +9,13 @@
     - trs_ci_system == "unknown"
     - lookup("env", "DCI_CS_URL") | length > 0
 
+- name: Recognize trs_ci_system as GitLab
+  ansible.builtin.set_fact:
+    trs_ci_system: gitlab
+  when:
+    - trs_ci_system == "unknown"
+    - lookup("env", "GITLAB_CI") | length > 0
+
 - name: Recognize trs_ci_system as Jenkins
   ansible.builtin.set_fact:
     trs_ci_system: jenkins

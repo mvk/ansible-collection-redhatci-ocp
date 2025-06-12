@@ -1,0 +1,16 @@
+---
+env2vars:
+  - key: ci_server_url
+    var: CI_SERVER_URL
+  - key: ci_workspace
+    var: CI_PROJECT_DIR
+  - key: ci_runner_name
+    var: CI_RUNNER_DESCRIPTION
+  - key: ci_runner_executor
+    var: CI_RUNNER_EXECUTOR
+  - key: ci_runner_specs
+    var: CI_RUNNER_TAGS
+    var_type: dict
+    splitter:
+      - " "
+      - ":"
