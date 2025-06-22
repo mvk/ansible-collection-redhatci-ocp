@@ -8,11 +8,12 @@
 
 - name: Update helper variables for trs_ci_runtime attributes for {{ trs_ci_system }}
   ansible.builtin.set_fact:
-    _ci: {'type': "{{ trs_ci_system }}"}
-    _pipeline: {}
-    _job: {}
-    _source: {}
+    ci: {'type': "{{ trs_ci_system }}"}
+    pipeline: {}
+    job: {}
+    source: {}
     github_event_payload_parsed: {}
+    product: {}
     _change_url: ''
     _repo_url: "{{ lookup('env', 'GITHUB_SERVER_URL') | default('') }}/{{ lookup('env', 'GITHUB_REPOSITORY') | default('') }}"
 
@@ -33,6 +34,7 @@
     - github_event_payload_parsed.pull_request is defined
     - github_event_payload_parsed.pull_request.html_url is defined
 
+- name: Update ci 
 - name: Ensure _repo_url is properly set
   ansible.builtin.assert:
     that: "{{ condition }}"
@@ -179,13 +181,16 @@
 
 - name: Construct the final trs_ci_runtime dictionary for {{ trs_ci_system }}
   ansible.builtin.set_fact:
-    trs_ci_runtime: "{{ combine({item.key: item.value}) }}"
+    trs_ci_runtime: "{{ trs_ci_runtime | combine({item.key: item.value}) }}"
   loop:
     - key: ci
-      value: "{{ _ci }}"
+      value: "{{ ci }}"
     - key: pipeline
-      value: "{{ _pipeline }}"
+      value: "{{ pipeline }}"
     - key: job
-      value: "{{ _job }}" # Now _job_info contains current job details and peer_jobs array
+      value: "{{ job }}" # Now _job_info contains current job details and peer_jobs array
     - key: source
-      value: "{{ _source }}"
+      value: "{{ source }}"
+    - key: product
+      value: "{{ product }}"
+
