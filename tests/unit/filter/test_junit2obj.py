@@ -16,7 +16,6 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 import json
 import pytest
-# TODO: reconcile current data conversion and pass it using the CI
 from ansible_collections.redhatci.ocp.plugins.filter import junit2obj
 
 
