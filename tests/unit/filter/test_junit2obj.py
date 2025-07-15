@@ -16,7 +16,10 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 import json
 import pytest
-from ansible_collections.redhatci.ocp.plugins.filter import junit2obj
+try:
+    from ansible_collections.redhatci.ocp.plugins.filter import junit2obj
+except ImportError:
+    from plugins.filter import junit2obj
 
 
 @pytest.fixture
@@ -36,6 +39,10 @@ def expected_data_object(request):  # type: ignore
 @pytest.mark.parametrize(
     "input_data,expected_data_object",
     [
+        (
+            "tests/unit/data/test_junit2obj_simple_single_input.xml",
+            "tests/unit/data/test_junit2obj_simple_result.json",
+        ),
         (
             "tests/unit/data/test_junit2obj_simple_input.xml",
             "tests/unit/data/test_junit2obj_simple_result.json",

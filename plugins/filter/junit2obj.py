@@ -31,9 +31,9 @@ DOCUMENTATION = r"""
     This filter plugin transforms a string JUnit XML data to JSON representation of it.
     It is being implemented because `junit2dict` filter does not retain suites information (timings),
     hence not allowing collecting of running times as metrics for future analysis.
-  positional: xml_report_text
+  positional: junit_report_text
   options:
-    xml_report_text:
+    junit_report_text:
       description: The junit report xml text data
       type: str
       required: true
@@ -41,7 +41,7 @@ DOCUMENTATION = r"""
 
 EXAMPLES = r"""
 
-    xml_report_text: |
+    junit_report_text: |
         <?xml version="1.0" encoding="UTF-8"?>
         <testsuites tests="3" disabled="2" errors="0" failures="0" time="0.000426228">
             <testsuite name="Performance Addon Operator Reboot" package="/home/jenkins/workspace/CNF/cnf-compute-4.18"
@@ -395,11 +395,11 @@ class FilterModule:
             "junit2obj": self.junit2obj,
         }
 
-    def junit2obj(self, xml_report_text: str) -> Dict[str, Any]:
+    def junit2obj(self, junit_report_text: str) -> Dict[str, Any]:
         """Convert JUnit XML Report into JSON using xml.etree.ElementTree.
 
         Args:
-            xml_report_text: String containing JUnit XML report
+            junit_report_text: String containing JUnit XML report
 
         Returns:
             Dictionary representation of the JUnit report
@@ -407,15 +407,15 @@ class FilterModule:
         Raises:
             ValueError: If XML is invalid or has unexpected structure
         """
-        if not isinstance(xml_report_text, str):
+        if not isinstance(junit_report_text, str):
             raise ValueError("Input must be a string")
 
-        if not xml_report_text.strip():
+        if not junit_report_text.strip():
             raise ValueError("Input XML cannot be empty")
 
         # Parse XML
         try:
-            root = etree.fromstring(xml_report_text.encode('utf-8'))
+            root = etree.fromstring(junit_report_text.encode('utf-8'))
         except etree.ParseError as exc:
             raise ValueError(f"Invalid XML: {exc}") from exc
 
