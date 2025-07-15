@@ -1,0 +1,6 @@
+junit_xml
+lxml
+junitparser
+jmespath
+python-dateutil
+semver
