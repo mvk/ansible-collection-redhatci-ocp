@@ -56,6 +56,9 @@ find -type f ! -executable -name '*.py' -print -exec sed -i -e '1{\@^#!.*@d}' '{
 
 %changelog
 * Tue Jul 15 2025 Max Kovgan <makovgan@redhat.com> - 2.7.EPOCH-VERS
+- upd role redhatci.ocp.junit2json
+
+* Tue Jul 15 2025 Max Kovgan <makovgan@redhat.com> - 2.7.EPOCH-VERS
 - migrate filters to lxml
 
 * Fri Jul 4 2025 Beto Rdz <josearod@redhat.com> - 2.6.EPOCH-VERS
