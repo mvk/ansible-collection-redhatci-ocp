@@ -7,7 +7,7 @@
     "test_suites": [
         {
             "name": "dci-openshift-app-agent",
-            "time": 0.044,
+            "time": 0.044028282165527344,
             "timestamp": "1970-01-01T00:00:00",
             "tests": 2,
             "failures": 2,
