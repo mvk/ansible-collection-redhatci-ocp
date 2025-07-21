@@ -1,5 +1,6 @@
+jmespath
 junit_xml
 junitparser
-jmespath
+lxml>=6.0.0,<7.0.0
 python-dateutil
 semver
