@@ -1,6 +1,5 @@
 jmespath
 junit_xml
-junitparser
 lxml>=6.0.0,<7.0.0
 python-dateutil
 semver
