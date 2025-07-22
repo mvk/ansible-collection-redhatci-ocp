@@ -16,6 +16,18 @@
 
 set -ex
 
+# Mac compatibility: use gnu utils if available
+GREP="grep"
+SED="sed"
+if [[ "$(uname -s || true)" == "Darwin" ]]; then
+  if command -v ggrep >/dev/null 2>&1; then
+    GREP="ggrep"
+  fi
+  if command -v gsed >/dev/null 2>&1; then
+    SED="gsed"
+  fi
+fi
+
 # when run outside of a GitHub action
 if [ -z "$GITHUB_STEP_SUMMARY" ]; then
     GITHUB_STEP_SUMMARY=/dev/null
@@ -67,12 +79,10 @@ run_tests() {
   done
 }
 
-# extract all the supported python versions from the error message, excluding 3.5
+# extract all the supported python versions using Python instead of grep/sed
 EXCLUDE="--exclude tests/ --exclude hack/ --exclude plugins/modules/nmcli.py"
 PY_VERS=$(ansible-test sanity $EXCLUDE --verbose --docker --python 1.0 --color --coverage --failure-ok 2>&1 |
-  grep -Po "invalid.*?\K'3.*\d'" |
-  tr -d ,\' |
-  sed -e 's/3.5 //g')
+  python -c "import re, sys; print(' '.join({m.group(1) for m in re.finditer(r'(3\.\d+)', sys.stdin.read()) if m.group(1) != '3.5'}))" || true)
 
 # Tests in current branch
 for version in $PY_VERS; do
@@ -88,24 +98,24 @@ for version in $PY_VERS; do
 done 2> main.output 1>/dev/null
 
 for key in branch main; do
-  grep -E "((ERROR|FATAL):|FAILED )" "$key.output" |
-  grep -v "issue(s) which need to be resolved\|See error output above for details.\|Command \"ansible-doc -t module .*\" returned exit status .*\." |
-  sed -r 's/\x1B\[[0-9]{1,2}[mGK]//g' > "$key.errors"
+  "${GREP}" -E "((ERROR|FATAL):|FAILED )" "$key.output" |
+  "${GREP}" -v "issue(s) which need to be resolved\|See error output above for details.\|Command \"ansible-doc -t module .*\" returned exit status .*\." |
+  "${SED}" -r 's/\x1B\[[0-9]{1,2}[mGK]//g' > "$key.errors"
 done
 
 # remove line numbers
-sed -i -E -e 's/:[0-9]+:/:/' -e 's/:[0-9]+:/:/' branch.errors main.errors
+"${SED}" -i -E -e 's/:[0-9]+:/:/' -e 's/:[0-9]+:/:/' branch.errors main.errors
 set +ex
 echo "## Improvements are listed below" | tee -a ${GITHUB_STEP_SUMMARY}
 echo "\`\`\`diff" >> ${GITHUB_STEP_SUMMARY}
-diff -u0 branch.errors main.errors | grep '^+[^+]' | sed -e 's/ERROR/FIXED/' | tee -a ${GITHUB_STEP_SUMMARY}
+diff -u0 branch.errors main.errors | "${GREP}" '^+[^+]' | "${SED}" -e 's/ERROR/FIXED/' | tee -a ${GITHUB_STEP_SUMMARY}
 echo "\`\`\`" >> ${GITHUB_STEP_SUMMARY}
 echo "## Regressions are listed below" | tee -a ${GITHUB_STEP_SUMMARY}
 echo "\`\`\`diff" >> ${GITHUB_STEP_SUMMARY}
-diff -u0 branch.errors main.errors | grep '^-[^-]' | tee -a ${GITHUB_STEP_SUMMARY}
+diff -u0 branch.errors main.errors | "${GREP}" '^-[^-]' | tee -a ${GITHUB_STEP_SUMMARY}
 echo "\`\`\`" >> ${GITHUB_STEP_SUMMARY}
 
-if diff -u0 branch.errors main.errors | grep -q '^-[^-]'; then
+if diff -u0 branch.errors main.errors | "${GREP}" -q '^-[^-]'; then
    echo "> Fix the regression errors listed above" | tee -a ${GITHUB_STEP_SUMMARY}
    exit 1
 fi
