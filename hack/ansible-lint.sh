@@ -25,48 +25,72 @@
 #~Arguments:
 #~  PATH    (Optional) path to lint, defaults to the top level directory
 
+TOPDIR="$(git rev-parse --show-toplevel || true)"
+test -z "${TOPDIR}" && { echo "FATAL: This script expects to run from a specific git repository" >&2; exit 1; }
+# shellcheck source=hack/common_lib.bash
+source "${TOPDIR}/hack/common_lib.bash"
+
+tools_setup "${OS}"
+
 function usage(){
-    grep "^#~" "$0" | sed -e "s/#~//"
+    grep "^#~" "$0" | sed -e "s/#~//" || true
 }
 
-set -x
+function installation_instructions() {
+    echo "You need to install ansible-lint. Ideally from the source code branch"
+    echo "Example:"
+    echo -e "pip install 'ansible-lint[lock] @ git+https://github.com/ansible/ansible-lint@v6'"
+}
 
-TOPDIR="$(git rev-parse --show-toplevel)"
-CWD="$PWD"
-BIN="$(which ansible-lint)"
+if [[ "${SCRIPT_DEBUG}" -gt 1 ]]; then
+    set -x
+fi
+
+BIN="$(command -v ansible-lint || true)"
 OFFLINE="--offline"
+declare -a EXTRA_ARGS
+EXTRA_ARGS+=(
+    --force-color
+    --parseable
+)
 
-while getopts ":b:d" o; do
-    case $o in
+while getopts ":b:d" option; do
+    case "${option}" in
         b)
-            BIN="$OPTARG"
+            BIN="${OPTARG}"
+            shift 2
             ;;
         d)
             OFFLINE=""
+            shift 1
             ;;
         *)
             usage
-            exit
+            die 1 "Invalid option: ${option}"
             ;;
     esac
 done
 
-shift $((OPTIND-1))
-EXTRA_ARGS="$@"
+BIN="$(command -v "${BIN}" || true)"
+declare -a CMD
 
-if ! test -x $BIN; then
-    echo "You need to install ansible-lint. Ideally from the source code branch"
-    echo "Example:"
-    echo -e "pip install 'ansible-lint[lock] @ git+https://github.com/ansible/ansible-lint@v6'"
-    exit 1
+if ! [[ -x "${BIN}" ]]; then
+    installation_instructions
+    die 1 "Cannot find passed or detected ansible-lint binary: ${BIN}"
+fi
+CMD=("${BIN}")
+if [[ -n "${OFFLINE}" ]]; then
+    CMD+=("${OFFLINE}")
+fi
+CMD+=("${EXTRA_ARGS[@]}")
+if [[ "${#@}" -gt 0 ]]; then
+    CMD+=("${@}")
 fi
 
-cd "$TOPDIR"
+run_cmd 0 pushd "${PWD}"
+run_cmd 0 cd "${TOPDIR}"
+log.info "Running: ${CMD[*]}"
+run_cmd 0 "${CMD[@]}" && RC=$? || RC=$?
+run_cmd 0 popd
 
-$BIN \
-    $OFFLINE \
-    --force-color \
-    --parseable \
-    $EXTRA_ARGS
-
-cd "$CWD"
+exit "${RC}"
