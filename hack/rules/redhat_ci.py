@@ -23,7 +23,8 @@ from ansiblelint.constants import ANNOTATION_KEYS, LINE_NUMBER_KEY
 from ansiblelint.errors import MatchError
 from ansiblelint.rules import AnsibleLintRule
 from ansiblelint.text import has_jinja
-from ansiblelint.utils import Lintable, Task
+from ansiblelint.utils import Task
+from ansiblelint.file_utils import Lintable
 
 _logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class CollectionNamingConvention(AnsibleLintRule):
     description = "RedHat OCP Collection naming convention"
     severity = "MEDIUM"
     tags = ["experimental", "idiom", "redhat"]
-    varsion_added = "historic"
+    version_added = "historic"
     needs_raw_task = True
     # These special variables are used by Ansible but we allow users to set
     # them as they might need it in certain cases.
