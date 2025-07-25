@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Copyright (C) 2021-2023 Red Hat, Inc.
 #
@@ -23,30 +23,37 @@
 #~  INPUT       File with a list of repositories to import from, the format of
 #~              the file is "URL BRANCH PATH(S)"
 
+
+
+TOPDIR="$(git rev-parse --show-toplevel || true)"
+test -z "${TOPDIR}" && { echo "FATAL: This script expects to run from a specific git repository" >&2; exit 1; }
+# shellcheck source=hack/common_lib.bash
+source "${TOPDIR}/hack/common_lib.bash"
+
+utils.tools_setup "$(uname -s || true)"
+
 function usage(){
-    grep '^#~' $0 | sed -e 's/#~//'
+    "${GREP}" '^#~' "$0" | sed -e 's/#~//' || true
 }
 
 INPUT="$1"
 
-if [ -z "${INPUT}" ]
+if [[ -z "${INPUT}" ]]
 then
     usage
     exit 1
 fi
 
-INPUT="$( readlink -f $INPUT )"
+INPUT="$( readlink -f "${INPUT}" )"
 
-if [ ! -f "$INPUT" ]
+if [[ ! -f "${INPUT}" ]]
 then
-    echo "File $INPUT does not exist"
+    echo "File ${INPUT} does not exist"
     exit 2
 fi
 
 # Check we have git-filter-repo installed
-git filter-repo -h &>/dev/null
-if [ $? -ne 0 ]
-then
+if ! git filter-repo -h &>/dev/null; then
     echo "The git-filter-repo subcommand is needed, please install first"
     exit 3
 fi
@@ -56,44 +63,44 @@ TEMPDIR="$( mktemp -d )"
 mkdir -pv "${TEMPDIR}/mixin"
 git -C "${TEMPDIR}/mixin" init
 TOPDIR="$(git rev-parse --show-toplevel)"
-CWD="$PWD"
+CWD="${PWD}"
 
-cd $TEMPDIR
+cd "${TEMPDIR}"
 # This leaves us with a repo with a single roles/ directory
-cat $INPUT | while read url branch paths; do
-    repo="$( basename $url .git )"
+while read -r url branch paths; do
+    repo="$( basename "${url}" .git )"
 
     # fresh clone
-    git clone $url
-    cd $repo
+    git clone "${url}"
+    cd "${repo}"
 
     PATHS=
-    for path in $paths; do
-        PATHS="$PATHS --path=$path --path-rename=$path:roles"
+    for path in ${paths}; do
+        PATHS="${PATHS} --path=${path} --path-rename=${path}:roles"
     done
 
     # leave the repo in a "clean" state only with a roles/ subdir
-    git filter-repo $PATHS
+    git filter-repo "${PATHS}"
 
     # mix all commits in the mixin repo
-    git -C "${TEMPDIR}/mixin" remote add $repo $TEMPDIR/$repo
-    git -C "${TEMPDIR}/mixin" fetch $repo $branch
+    git -C "${TEMPDIR}/mixin" remote add "${repo}" "${TEMPDIR}"/"${repo}"
+    git -C "${TEMPDIR}/mixin" fetch "${repo}" "${branch}"
     # by merging and not rebasing we keep the history consistent
-    git -C "${TEMPDIR}/mixin" merge --allow-unrelated-histories $repo/$branch
+    git -C "${TEMPDIR}/mixin" merge --allow-unrelated-histories "${repo}"/"${branch}"
 
     cd ..
-done
+done <<< "${INPUT}"
 
-cd $TOPDIR
+cd "${TOPDIR}"
 
 git branch -D import-workspace || echo "no import workspace found"
 git remote rm mixin || echo "no remote mixin found"
 git switch --orphan import-workspace
 git merge main
-git remote add mixin $TEMPDIR/mixin
+git remote add mixin "${TEMPDIR}"/mixin
 git fetch mixin
 git merge --allow-unrelated-histories mixin/main
 
 git gc
 
-cd $CWD
+cd "${CWD}"

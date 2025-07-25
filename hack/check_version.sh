@@ -23,8 +23,16 @@
 # - If there is a removed role, check that the major version is incremented.
 # - If there is a new role, check that the minor version is incremented.
 
+
+TOPDIR="$(git rev-parse --show-toplevel || true)"
+test -z "${TOPDIR}" && { echo "FATAL: This script expects to run from a specific git repository" >&2; exit 1; }
+# shellcheck source=hack/common_lib.bash
+source "${TOPDIR}/hack/common_lib.bash"
+
+utils.tools_setup "$(uname -s || true)"
+
 error() {
-    if [ -n "${GITHUB_STEP_SUMMARY}" ]; then
+    if [[ -n "${GITHUB_STEP_SUMMARY}" ]]; then
         echo "- check_version: ${1}" | tee -a "${GITHUB_STEP_SUMMARY}"
     else
         echo "Error: check_version: ${1}"
@@ -33,36 +41,40 @@ error() {
 }
 
 # Verify consistency of version numbers in galaxy.yml and rpm spec file
-spec_version=$(grep Version: ansible-collection-redhatci-ocp.spec | awk '{print $2}' | cut -d. -f1,2)
-galaxy_version=$(grep version: galaxy.yml | awk '{print $2}' | cut -d. -f1,2)
+spec_version="$(grep Version: ansible-collection-redhatci-ocp.spec | awk '{print $2}' | cut -d. -f1,2 || true)"
+galaxy_version="$(grep version: galaxy.yml | awk '{print $2}' | cut -d. -f1,2 || true)"
 
-if [ "$spec_version" != "$galaxy_version" ]; then
+if [[ "${spec_version}" != "${galaxy_version}" ]]; then
     error "Inconsistent: rpm spec: ${spec_version} galaxy: ${galaxy_version}"
 fi
 
-branch=$(git rev-parse --abbrev-ref HEAD)
+branch="$(git rev-parse --abbrev-ref HEAD || true)"
 
-if [ -z "$branch" ]; then
+if [[ -z "${branch}" ]]; then
     error "Unable to determine the current branch."
 fi
 
-REMOVED=$(git diff --diff-filter=D --name-only origin/main...$branch | grep -Eo '^roles/.+/' |
-sed -Ee 's@(roles|defaults|templates|vars|scripts|handlers|tests|meta|tasks|files)/@@g' -e 's@/$@@' | uniq)
+REMOVED="$(git diff --diff-filter=D --name-only origin/main..."${branch}" \
+  | "${GREP}" -Eo '^roles/.+/' \
+  | "${SED}" -Ee 's@(roles|defaults|templates|vars|scripts|handlers|tests|meta|tasks|files)/@@g' -e 's@/$@@' \
+  | uniq || true)"
 
-ADDED=$(git diff --diff-filter=A --name-only origin/main...$branch | grep -Eo '^roles/.+/' |
-sed -Ee 's@(roles|defaults|templates|vars|scripts|handlers|tests|meta|tasks|files)/@@g' -e 's@/$@@' | uniq)
+ADDED="$(git diff --diff-filter=A --name-only origin/main..."${branch}" \
+  | "${GREP}" -Eo '^roles/.+/' \
+  | "${SED}" -Ee 's@(roles|defaults|templates|vars|scripts|handlers|tests|meta|tasks|files)/@@g' -e 's@/$@@' \
+  | uniq || true)"
 
 # check if the roles are fully removed
-if [ -n "$REMOVED" ]; then
-    for role in $REMOVED; do
-        if [ ! -d "roles/$role" ]; then
+if [[ -n "${REMOVED}" ]]; then
+    for role in ${REMOVED}; do
+        if [[ ! -d "roles/${role}" ]]; then
             # role is fully removed, so check if the major version is
             # incremented in galaxy.yml
-            major=$(grep -E '^version:' galaxy.yml | awk '{print $2}' | cut -d'.' -f1)
+            major="$("${GREP}" -E '^version:' galaxy.yml | awk '{print $2}' | cut -d'.' -f1 || true)"
             # get the major version from the main branch
-            major_main=$(git show origin/main:galaxy.yml | grep -E '^version:' | awk '{print $2}' | cut -d'.' -f1)
+            major_main="$(git show origin/main:galaxy.yml | "${GREP}" -E '^version:' | awk '{print $2}' | cut -d'.' -f1 || true)"
             # check if the major version is incremented
-            if [ "$major" -le "$major_main" ]; then
+            if [[ "${major}" -le "${major_main}" ]]; then
                 error "Major version must be incremented for removed role ${role//\//.}"
             fi
         fi
@@ -70,23 +82,23 @@ if [ -n "$REMOVED" ]; then
 fi
 
 # check if the roles are fully added
-if [ -n "$ADDED" ]; then
-    for role in $ADDED; do
+if [[ -n "${ADDED}" ]]; then
+    for role in ${ADDED}; do
         # check if $role doesn't exist in the main branch
-        if ! git show origin/main:roles/$role > /dev/null 2>&1; then
+        if ! git show origin/main:roles/"${role}" > /dev/null 2>&1; then
             # role is fully added, so check if the minor version is
             # incremented in galaxy.yml. Check major and minor version
             # in the case there was a removed role.
-            major=$(grep -E '^version:' galaxy.yml | awk '{print $2}' | cut -d'.' -f1)
-            minor=$(grep -E '^version:' galaxy.yml | awk '{print $2}' | cut -d'.' -f2)
+            major="$("${GREP}" -E '^version:' galaxy.yml | awk '{print $2}' | cut -d'.' -f1 || true)"
+            minor="$("${GREP}" -E '^version:' galaxy.yml | awk '{print $2}' | cut -d'.' -f2 || true)"
             # get the minor version from the main branch
-            major_main=$(git show origin/main:galaxy.yml | grep -E '^version:' | awk '{print $2}' | cut -d'.' -f1)
-            minor_main=$(git show origin/main:galaxy.yml | grep -E '^version:' | awk '{print $2}' | cut -d'.' -f2)
+            major_main="$(git show origin/main:galaxy.yml | "${GREP}" -E '^version:' | awk '{print $2}' | cut -d'.' -f1 || true)"
+            minor_main="$(git show origin/main:galaxy.yml | "${GREP}" -E '^version:' | awk '{print $2}' | cut -d'.' -f2 || true)"
             # check if major.minor is greater than the main branch
-            if [ "$major" -lt "$major_main" ]; then
+            if [[ "${major}" -lt "${major_main}" ]]; then
                 error "Major version (${major}.${minor}) must be incremented for new role ${role//\//.}"
-            elif [ "$major" -eq "$major_main" ]; then
-                if [ "$minor" -le "$minor_main" ]; then
+            elif [[ "${major}" -eq "${major_main}" ]]; then
+                if [[ "${minor}" -le "${minor_main}" ]]; then
                     error "Minor version ${minor} must be incremented for new role ${role//\//.}"
                 fi
             fi

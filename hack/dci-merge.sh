@@ -16,20 +16,27 @@
 
 # script called from a merge queue branch of the redhatci/ansible-collection-redhatci-ocp repo
 
-if [ $# -ne 2 ]; then
-    echo "Usage: $0 <base_sha> <head_sha>"
+TOPDIR="$(git rev-parse --show-toplevel || true)"
+test -z "${TOPDIR}" && { echo "FATAL: This script expects to run from a specific git repository" >&2; exit 1; }
+# shellcheck source=hack/common_lib.bash
+source "${TOPDIR}/hack/common_lib.bash"
+
+utils.tools_setup "$(uname -s || true)"
+
+if [[ $# -ne 2 ]]; then
+    echo "Usage: $0 <base_sha> <head_sha>" >&2
     exit 1
 fi
 
-BASE_SHA="$1"
-HEAD_SHA="$2"
-STATUSES_URL="https://api.github.com/repos/redhatci/ansible-collection-redhatci-ocp/statuses/$HEAD_SHA"
+BASE_SHA="${1:-}"
+HEAD_SHA="${2:-}"
+STATUSES_URL="https://api.github.com/repos/redhatci/ansible-collection-redhatci-ocp/statuses/${HEAD_SHA}"
 GITHUB_JOBNAME="DCI / DCI Job"
-DCI_QUEUE=
-FORCE_CHECK=
+DCI_QUEUE=""
+FORCE_CHECK=""
 
 # shellcheck disable=SC1091
-if [ -r /etc/dci-openshift-agent/config ]; then
+if [[ -r /etc/dci-openshift-agent/config ]]; then
     . /etc/dci-openshift-agent/config
 fi
 
@@ -39,13 +46,11 @@ GH_HEADERS=(
 )
 
 send_status() {
-    curl -s "${GH_HEADERS[@]/#/-H}" -X POST -d "{\"state\":\"$1\",\"description\":\"$2\",\"context\":\"$GITHUB_JOBNAME\"}" "$STATUSES_URL"
+    curl -s "${GH_HEADERS[@]/#/-H}" -X POST -d "{\"state\":\"$1\",\"description\":\"$2\",\"context\":\"${GITHUB_JOBNAME}\"}" "${STATUSES_URL}"
 }
 
-set -x
-
 # Lookup the merge commits and get their PR descriptions to detect Test-Hints: strings
-PRS="$(git log --merges "${BASE_SHA}".."${HEAD_SHA}" | grep -oP 'Merge pull request #\K\d+')"
+PRS="$(git log --merges "${BASE_SHA}".."${HEAD_SHA}" | "${GREP}" -oP 'Merge pull request #\K\d+' || true)"
 
 NB_PRS=0
 NB_NOCHECK=0
@@ -54,51 +59,53 @@ declare -a CMD
 declare -a CMD_SNO
 declare -a CMD_SNO_BM
 
-for PR in $PRS; do
-    if [ -n "$PR" ]; then
+for PR in ${PRS}; do
+    if [[ -n "${PR}" ]]; then
         NB_PRS=$((NB_PRS+1))
-        DESC=$(curl -s "${GH_HEADERS[@]/#/-H}" https://api.github.com/repos/redhatci/ansible-collection-redhatci-ocp/pulls/"$PR"|jq -r .body)
+        DESC="$(curl -s "${GH_HEADERS[@]/#/-H}" https://api.github.com/repos/redhatci/ansible-collection-redhatci-ocp/pulls/"${PR}" | jq -r .body || true)"
 
-        if [[ no-check =~ $SUPPORTED_HINTS ]] && grep -qEi "^\s*Test-Hints?:\s*no-check\s*" <<< "$DESC"; then
+        # shellcheck disable=SC2154
+        if [[ "no-check" =~ ${SUPPORTED_HINTS} ]] && "${GREP}" -qEi "^\s*Test-Hints?:\s*no-check\s*" <<< "${DESC}"; then
             NB_NOCHECK=$((NB_NOCHECK+1))
             continue
         fi
 
-        if [[ force-check =~ $SUPPORTED_HINTS ]] && grep -qEi "^\s*Test-Hints?:\s*force-check\s*" <<< "$DESC"; then
+        # shellcheck disable=SC2154
+        if [[ "force-check" =~ ${SUPPORTED_HINTS} ]] && "${GREP}" -qEi "^\s*Test-Hints?:\s*force-check\s*" <<< "${DESC}"; then
             FORCE_CHECK=1
         fi
 
         # extract TestBos2 commands
         # Remove \r character if present
-        if grep -qE "^\s*TestBos2:\s*" <<< "$DESC"; then
+        if "${GREP}" -qE "^\s*TestBos2:\s*" <<< "${DESC}"; then
             # shellcheck disable=SC2001,SC2086
-            CMD+=("$(sed -ne 's/^\s*TestBos2:\s*//p' <<< $DESC | sed 's/\r$//')")
+            CMD+=("$("${SED}" -ne 's/^\s*TestBos2:\s*//p' <<< "${DESC}" | "${SED}" 's/\r$//' || true)")
         fi
         # extract TestBos2Sno commands
         # Remove \r character if present
-        if grep -qE "^\s*TestBos2Sno:\s*" <<< "$DESC"; then
+        if "${GREP}" -qE "^\s*TestBos2Sno:\s*" <<< "${DESC}"; then
             # shellcheck disable=SC2001,SC2086
-            CMD_SNO+=("$(sed -ne 's/^\s*TestBos2Sno:\s*//p' <<< $DESC | sed 's/\r$//')")
+            CMD_SNO+=("$("${SED}" -ne 's/^\s*TestBos2Sno:\s*//p' <<< "${DESC}" | "${SED}" 's/\r$//' || true)")
         fi
         # extract TestBos2Baremetal commands
         # Remove \r character if present
-        if grep -qE "^\s*TestBos2Baremetal:\s*" <<< "$DESC"; then
+        if "${GREP}" -qE "^\s*TestBos2Baremetal:\s*" <<< "${DESC}"; then
             # shellcheck disable=SC2001,SC2086
-            CMD_SNO_BM+=("$(sed -ne 's/^\s*TestBos2Baremetal:\s*//p' <<< $DESC | sed 's/\r$//')")
+            CMD_SNO_BM+=("$("${SED}" -ne 's/^\s*TestBos2Baremetal:\s*//p' <<< "${DESC}" | "${SED}" 's/\r$//' || true)")
         fi
     fi
 done
 
 # Check if there is a code change
-if [ -z "$FORCE_CHECK" ] && ! git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -v '\.md$' | grep -E 'roles/|plugins/'; then
+if [[ -z "${FORCE_CHECK}" ]] && ! git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" | "${GREP}" -v '\.md$' | "${GREP}" -E 'roles/|plugins/' || true; then
     send_status success "No code change"
     exit 0
 fi
 
 
 # if nothing is specified
-if [ -z "$FORCE_CHECK" ]; then
-    if [ "$NB_NOCHECK" -ge 1 ] && [ "$NB_NOCHECK" -eq "$NB_PRS" ]; then
+if [[ -z "${FORCE_CHECK}" ]]; then
+    if [[ "${NB_NOCHECK}" -ge 1 ]] && [[ "${NB_NOCHECK}" -eq "${NB_PRS}" ]]; then
         send_status success "No check"
         exit 0
     fi
@@ -106,18 +113,18 @@ fi
 
 # Copy the change to another directory to let test-runner own
 # it. Avoid the directory being removed by the Github action code.
-DIR=$HOME/github/ansible-collection-redhatci-ocp-mq-$HEAD_SHA
-mkdir -p "$DIR"
-cp -a "$PWD/" "$DIR/"
+DIR="${HOME}/github/ansible-collection-redhatci-ocp-mq-${HEAD_SHA}"
+mkdir -p "${DIR}"
+cp -a "${PWD}/" "${DIR}/"
 
-cd "$DIR" || exit 1
+cd "${DIR}" || exit 1
 
 # Create a json file to be used by send-feedback and test-runner
 cat > github.json << EOF
 {
     "number": "${HEAD_SHA:0:8}",
     "url": "https://github.com/redhatci/ansible-collection-redhatci-ocp/pulls",
-    "statuses_url": "$STATUSES_URL",
+    "statuses_url": "${STATUSES_URL}",
     "html_url": "https://github.com/redhatci/ansible-collection-redhatci-ocp/queue/main",
     "body": "",
     "head": {
@@ -133,37 +140,37 @@ COUNT=0
 
 for ARGS in "${CMD[@]}"; do
     # shellcheck disable=SC2086
-    dci-queue schedule "$DCI_QUEUE" -- env GITHUB_TOKEN=$GITHUB_TOKEN STATUSES_URL=$STATUSES_URL DCI_QUEUE_RESOURCE=@RESOURCE /usr/share/dci-pipeline/test-runner $DIR $ARGS || exit 1
+    dci-queue schedule "${DCI_QUEUE}" -- env GITHUB_TOKEN="${GITHUB_TOKEN}" STATUSES_URL="${STATUSES_URL}" DCI_QUEUE_RESOURCE=@RESOURCE /usr/share/dci-pipeline/test-runner "${DIR}" "${ARGS}" || exit 1
     COUNT=$((COUNT+1))
 done
 
-dci-queue list "$DCI_QUEUE"
+dci-queue list "${DCI_QUEUE}"
 
-if [ ${#CMD_SNO[@]} -gt 0 ]; then
+if [[ ${#CMD_SNO[@]} -gt 0 ]]; then
     DCI_QUEUE="sno"
 
     for ARGS in "${CMD_SNO[@]}"; do
         # shellcheck disable=SC2086
-        dci-queue schedule "$DCI_QUEUE" -- env GITHUB_TOKEN=$GITHUB_TOKEN STATUSES_URL=$STATUSES_URL DCI_QUEUE_RESOURCE=@RESOURCE /usr/share/dci-pipeline/test-runner $DIR $ARGS || exit 1
+        dci-queue schedule "${DCI_QUEUE}" -- env GITHUB_TOKEN="${GITHUB_TOKEN}" STATUSES_URL="${STATUSES_URL}" DCI_QUEUE_RESOURCE=@RESOURCE /usr/share/dci-pipeline/test-runner "${DIR}" "${ARGS}" || exit 1
         COUNT=$((COUNT+1))
     done
 
-    dci-queue list "$DCI_QUEUE"
+    dci-queue list "${DCI_QUEUE}"
 fi
 
-if [ ${#CMD_SNO_BM[@]} -gt 0 ]; then
+if [[ "${#CMD_SNO_BM[@]}" -gt 0 ]]; then
     DCI_QUEUE="sno_baremetal"
 
     for ARGS in "${CMD_SNO_BM[@]}"; do
         # shellcheck disable=SC2086
-        dci-queue schedule "$DCI_QUEUE" -- env GITHUB_TOKEN=$GITHUB_TOKEN STATUSES_URL=$STATUSES_URL DCI_QUEUE_RESOURCE=@RESOURCE /usr/share/dci-pipeline/test-runner $DIR $ARGS || exit 1
+        dci-queue schedule "${DCI_QUEUE}" -- env GITHUB_TOKEN="${GITHUB_TOKEN}" STATUSES_URL="${STATUSES_URL}" DCI_QUEUE_RESOURCE=@RESOURCE /usr/share/dci-pipeline/test-runner "${DIR}" "${ARGS}" || exit 1
         COUNT=$((COUNT+1))
     done
 
-    dci-queue list "$DCI_QUEUE"
+    dci-queue list "${DCI_QUEUE}"
 fi
 
-if [ $COUNT -eq 0 ]; then
+if [[ "${COUNT}" -eq 0 ]]; then
     send_status success "No test specified for BOS2"
     exit 0
 fi
